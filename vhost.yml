@@ -1,0 +1,45 @@
+---
+- name: Setup Nginx Virtual Host
+  hosts: all
+  become: yes
+  vars:
+    domain_name: "demo.local" # This will be overridden by Semaphore UI
+    doc_root: "/var/www/{{ domain_name }}"
+
+  tasks:
+    - name: Ensure Nginx is installed
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Create document root directory
+      file:
+        path: "{{ doc_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Create a sample index.html
+      copy:
+        content: "<h1>Welcome to {{ domain_name }}</h1>"
+        dest: "{{ doc_root }}/index.html"
+
+    - name: Deploy Nginx virtual host configuration
+      template:
+        src: templates/nginx_vhost.conf.j2
+        dest: /etc/nginx/sites-available/{{ domain_name }}.conf
+
+    - name: Enable the virtual host
+      file:
+        src: /etc/nginx/sites-available/{{ domain_name }}.conf
+        dest: /etc/nginx/sites-enabled/{{ domain_name }}.conf
+        state: link
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
